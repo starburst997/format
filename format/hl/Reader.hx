@@ -145,6 +145,8 @@ class Reader {
 			});
 		case 19:
 			return HNull(getType());
+		case 20:
+			return HFun({ args : [for( i in 0..._read() ) HAt(uindex())], ret : HAt(uindex()) });
 		case x:
 			throw "Unsupported type value " + x;
 		}
@@ -289,12 +291,13 @@ class Reader {
 		if( i.readString(3) != "HLB" )
 			throw "Invalid HL file";
 		version = _read();
-		if( version <= 1 || version > 4 )
+		if( version <= 1 || version > 5 )
 			throw "HL Version " + version + " is not supported";
 		flags = haxe.EnumFlags.ofInt(uindex());
 		var nints = uindex();
 		var nfloats = uindex();
 		var nstrings = uindex();
+		var nbytes = version >= 5 ? uindex() : 0;
 		var ntypes = uindex();
 		var nglobals = uindex();
 		var nnatives = uindex();
@@ -304,6 +307,11 @@ class Reader {
 		var ints = [for( _ in 0...nints ) i.readInt32()];
 		var floats = [for( _ in 0...nfloats ) i.readDouble()];
 		strings = readStrings(nstrings);
+		var bytes = null, bytesPos = null;
+		if( version >= 5 ) {
+			bytes = i.read(i.readInt32());
+			bytesPos = [for( _ in 0...nbytes ) uindex()];
+		}
 		debugFiles = null;
 		if( flags.has(HasDebug) )
 			debugFiles = readStrings(uindex());
@@ -312,7 +320,7 @@ class Reader {
 			types[i] = readType();
 		for( i in 0...ntypes )
 			switch( types[i] ) {
-			case HFun(f):
+			case HFun(f), HMethod(f):
 				for( i in 0...f.args.length ) f.args[i] = fixType(f.args[i]);
 				f.ret = fixType(f.ret);
 			case HObj(p):
@@ -333,6 +341,8 @@ class Reader {
 			ints : ints,
 			floats : floats,
 			strings : strings,
+			bytes : bytes,
+			bytesPos : bytesPos,
 			debugFiles : debugFiles,
 			types : types,
 			entryPoint : entryPoint,
